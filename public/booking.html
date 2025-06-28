@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Slot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { max-width: 800px; width: 100%; background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 25px; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .message-box { text-align: center; padding: 15px; margin: 20px 0; border-radius: 8px; font-weight: bold; }
+        .message-success { background-color: #e6f7d4; color: #52c41a; border: 1px solid #b7eb8f; }
+        .message-error { background-color: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; }
+
+        /* Date Picker / Calendar Styling */
+        .date-picker { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        .date-chip { padding: 12px 18px; background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 25px; cursor: pointer; font-weight: bold; transition: all 0.3s ease; text-align: center; user-select: none; }
+        .date-chip:hover { background-color: #d1d8df; }
+        .date-chip.selected { background-color: #007bff; color: white; border-color: #007bff; }
+        .date-chip.selected:hover { background-color: #0056b3; }
+        .date-chip.disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Time Slots Styling */
+        .time-slots { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+        .time-chip { padding: 12px 20px; background-color: #f0f0f0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.3s ease; }
+        .time-chip:hover { background-color: #e0e0e0; }
+        .time-chip.selected { background-color: #28a745; color: white; border-color: #28a745; }
+        .time-chip.selected:hover { background-color: #218838; }
+
+        /* Booking Form Styling */
+        #booking-form { margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee; display: none; flex-direction: column; gap: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-weight: bold; margin-bottom: 5px; color: #555; }
+        .form-group input { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
+        .form-group input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); }
+        .book-btn { padding: 15px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; transition: background-color 0.3s; }
+        .book-btn:hover { background-color: #0056b3; }
+        .book-btn:disabled { background-color: #cce5ff; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="page-title">Booking for...</h1>
+        <div id="loading-spinner" class="loader"></div>
+        <div id="message-container" class="message-box" style="display: none;"></div>
+
+        <section id="date-selection-section" style="display: none;">
+            <h2>Select a Date</h2>
+            <div id="date-picker-container" class="date-picker">
+                </div>
+        </section>
+
+        <section id="time-selection-section" style="display: none;">
+            <h2>Select a Time Slot (<span id="selected-date-display"></span>)</h2>
+            <div id="time-slots-container" class="time-slots">
+                </div>
+            <div id="no-slots-message" style="text-align: center; margin-top: 20px; font-style: italic; color: #777; display: none;">
+                No available slots for this date.
+            </div>
+        </section>
+
+        <form id="booking-form" style="display: none;">
+            <h3>Book Your Slot</h3>
+            <div class="form-group">
+                <label for="client-name">Your Name:</label>
+                <input type="text" id="client-name" name="name" required placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label for="client-email">Your Email:</label>
+                <input type="email" id="client-email" name="email" required placeholder="your.email@example.com">
+            </div>
+            <button type="submit" class="book-btn" id="book-button">Book Slot</button>
+        </form>
+    </div>
+
+    <script>
+        const pageTitle = document.getElementById('page-title');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const messageContainer = document.getElementById('message-container');
+        const datePickerContainer = document.getElementById('date-picker-container');
+        const timeSlotsContainer = document.getElementById('time-slots-container');
+        const selectedDateDisplay = document.getElementById('selected-date-display');
+        const bookingForm = document.getElementById('booking-form');
+        const noSlotsMessage = document.getElementById('no-slots-message');
+        const clientNameInput = document.getElementById('client-name');
+        const clientEmailInput = document.getElementById('client-email');
+        const bookButton = document.getElementById('book-button');
+
+        let username = '';
+        let availableSlots = {}; // Grouped by date: { '2025-07-01': [...slots], '2025-07-02': [...] }
+        let selectedDate = null;
+        let selectedStartTime = null;
+
+        // Function to display messages to the user
+        function displayMessage(message, type = 'success') {
+            messageContainer.textContent = message;
+            messageContainer.className = `message-box message-${type}`;
+            messageContainer.style.display = 'block';
+        }
+
+        // Function to hide all main sections and show the loading spinner
+        function showLoading() {
+            loadingSpinner.style.display = 'block';
+            document.getElementById('date-selection-section').style.display = 'none';
+            document.getElementById('time-selection-section').style.display = 'none';
+            bookingForm.style.display = 'none';
+            messageContainer.style.display = 'none';
+        }
+
+        // Fetch available slots from the backend
+        async function fetchAvailableSlots() {
+            showLoading();
+            // Get username from the URL path, e.g., /book/user123 -> user123
+            const pathSegments = window.location.pathname.split('/');
+            username = pathSegments[pathSegments.length - 1];
+            pageTitle.textContent = `Book a slot with ${username}`;
+
+            try {
+                const response = await fetch(`/api/book/${username}/available-slots`);
+                const result = await response.json();
+                availableSlots = result;
+                console.log('avalableslot',result,availableSlots)
+
+                if (!response.ok) {
+                    // Server-side validation error or 404 from our API
+                    throw new Error(result.error || 'Failed to fetch available slots.');
+                }
+
+                if (result.availableSlots.length === 0) {
+                    displayMessage('No available slots found for this user.', 'error');
+                } else {
+                    // Group slots by date for easier rendering
+                    availableSlots = result.availableSlots.reduce((acc, slot) => {
+                        const date = slot.date;
+                        if (!acc[date]) {
+                            acc[date] = [];
+                        }
+                        acc[date].push(slot);
+                        return acc;
+                    }, {});
+
+                    renderDateChips();
+                    document.getElementById('date-selection-section').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                displayMessage(error.message, 'error');
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        // Render date chips based on available slots
+        function renderDateChips() {
+            datePickerContainer.innerHTML = ''; // Clear previous chips
+            const dates = Object.keys(availableSlots).sort();
+
+            if (dates.length === 0) {
+                datePickerContainer.innerHTML = '<p>No future dates with available slots.</p>';
+                return;
+            }
+
+            dates.forEach(date => {
+                const dateChip = document.createElement('div');
+                dateChip.className = 'date-chip';
+                dateChip.textContent = date; // You can format this date if needed
+                dateChip.dataset.date = date;
+                dateChip.addEventListener('click', () => selectDate(date));
+                datePickerContainer.appendChild(dateChip);
+            });
+        }
+
+        // Handle date selection
+        function selectDate(date) {
+            // Remove 'selected' class from all date chips
+            document.querySelectorAll('.date-chip').forEach(chip => chip.classList.remove('selected'));
+            // Add 'selected' class to the clicked chip
+            document.querySelector(`.date-chip[data-date="${date}"]`).classList.add('selected');
+
+            selectedDate = date;
+            selectedStartTime = null; // Reset selected time
+            
+            // Show the time selection section and render time slots
+            document.getElementById('time-selection-section').style.display = 'block';
+            bookingForm.style.display = 'none'; // Hide form until time is selected
+            renderTimeSlots(availableSlots[date]);
+            selectedDateDisplay.textContent = date;
+            
+            messageContainer.style.display = 'none'; // Hide messages
+        }
+
+        // Render time chips for the selected date
+        function renderTimeSlots(slots) {
+            timeSlotsContainer.innerHTML = ''; // Clear previous chips
+            if (!slots || slots.length === 0) {
+                noSlotsMessage.style.display = 'block';
+                return;
+            }
+            noSlotsMessage.style.display = 'none';
+
+            slots.forEach(slot => {
+                const timeChip = document.createElement('div');
+                timeChip.className = 'time-chip';
+                timeChip.textContent = `${slot.start_time} - ${slot.end_time}`;
+                timeChip.dataset.startTime = slot.start_time;
+                timeChip.addEventListener('click', () => selectTime(slot.start_time, timeChip));
+                timeSlotsContainer.appendChild(timeChip);
+            });
+        }
+
+        // Handle time selection
+        function selectTime(startTime, element) {
+            // Remove 'selected' class from all time chips
+            document.querySelectorAll('.time-chip').forEach(chip => chip.classList.remove('selected'));
+            // Add 'selected' class to the clicked chip
+            element.classList.add('selected');
+            
+            selectedStartTime = startTime;
+            bookingForm.style.display = 'flex'; // Show the booking form
+            bookButton.disabled = false;
+            
+            messageContainer.style.display = 'none'; // Hide messages
+        }
+
+        // Handle booking form submission
+        bookingForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            // Client-side validation for the form
+            if (!selectedDate || !selectedStartTime) {
+                displayMessage('Please select a date and time.', 'error');
+                return;
+            }
+            if (!clientNameInput.value || !clientEmailInput.value) {
+                displayMessage('Please enter your name and email.', 'error');
+                return;
+            }
+            // Basic email regex
+            if (!clientEmailInput.value.match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
+                displayMessage('Please enter a valid email address.', 'error');
+                return;
+            }
+
+            bookButton.textContent = 'Booking...';
+            bookButton.disabled = true;
+
+            const bookingData = {
+                username,
+                bookedDate: selectedDate,
+                bookedTime: selectedStartTime,
+                clientName: clientNameInput.value,
+                clientEmail: clientEmailInput.value
+            };
+            
+            try {
+                const response = await fetch('/api/book/create-booking', { // We will create this API next
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    displayMessage('Booking successful! A confirmation email has been sent.', 'success');
+                    // Reset UI after successful booking
+                    bookingForm.style.display = 'none';
+                    clientNameInput.value = '';
+                    clientEmailInput.value = '';
+                    // Re-fetch slots to update the UI and remove the booked slot
+                    fetchAvailableSlots();
+                } else {
+                    displayMessage(result.error || 'Failed to book the slot.', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                displayMessage('An unexpected error occurred. Please try again.', 'error');
+            } finally {
+                bookButton.textContent = 'Book Slot';
+                bookButton.disabled = false;
+            }
+        });
+
+        // Initialize the page by fetching data when the page loads
+        document.addEventListener('DOMContentLoaded', fetchAvailableSlots);
+    </script>
+</body>
+</html>

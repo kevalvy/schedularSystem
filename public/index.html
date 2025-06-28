@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Define Your Availability</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        h1 { text-align: center; }
+        form { display: flex; flex-direction: column; gap: 15px; }
+        label { font-weight: bold; }
+        input[type="date"], input[type="time"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; background-color: #007BFF; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        .success-message { color: green; font-weight: bold; margin-top: 10px; }
+        .error-message { color: red; font-weight: bold; margin-top: 10px; }
+        #availability-list { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
+        .slot-item { background-color: #f9f9f9; padding: 10px; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .slot-item span { font-size: 1.1em; }
+        #link-section { margin-top: 30px; text-align: center; }
+        #booking-link { font-size: 1.2em; font-weight: bold; color: #007BFF; text-decoration: none; word-break: break-all; }
+        #booking-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Define Your Availability</h1>
+
+        <form id="availability-form">
+            <label for="username">Username (for demonstration):</label>
+            <input type="text" id="username" name="username" placeholder="Enter your username" required>
+
+            <label for="date">Date:</label>
+            <input type="date" id="date" name="date" required>
+
+            <label for="start-time">Start Time:</label>
+            <input type="time" id="start-time" name="start_time" required>
+
+            <label for="end-time">End Time:</label>
+            <input type="time" id="end-time" name="end_time" required>
+
+            <button type="submit">Save Availability</button>
+        </form>
+
+        <div id="message-container"></div>
+
+        <section id="availability-list">
+            <h2>Your Saved Slots:</h2>
+            </section>
+
+        <section id="link-section">
+            <button id="generate-link-btn" disabled>Generate Booking Link</button>
+            <div id="booking-link-container" style="display: none; margin-top: 10px;">
+                <p>Share this link with your clients:</p>
+                <a id="booking-link" href="#" target="_blank"></a>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const form = document.getElementById('availability-form');
+        const usernameInput = document.getElementById('username');
+        const dateInput = document.getElementById('date');
+        const startTimeInput = document.getElementById('start-time');
+        const endTimeInput = document.getElementById('end-time');
+        const messageContainer = document.getElementById('message-container');
+        const availabilityList = document.getElementById('availability-list');
+        const generateLinkBtn = document.getElementById('generate-link-btn');
+        const bookingLinkContainer = document.getElementById('booking-link-container');
+        const bookingLink = document.getElementById('booking-link');
+
+        // This list will hold the saved data from the API response (client-side only)
+        let savedSlots = [];
+
+        // Function to display messages
+        function displayMessage(message, type) {
+            messageContainer.innerHTML = `<p class="${type}-message">${message}</p>`;
+        }
+
+        // Function to render the list of saved slots
+        function renderSavedSlots() {
+            availabilityList.innerHTML = '<h2>Your Saved Slots:</h2>';
+            if (savedSlots.length === 0) {
+                availabilityList.innerHTML += '<p>No slots saved yet.</p>';
+                generateLinkBtn.disabled = true;
+            } else {
+                savedSlots.forEach(slot => {
+                    const slotItem = document.createElement('div');
+                    slotItem.classList.add('slot-item');
+                    slotItem.innerHTML = `
+                        <span>Date: ${slot.date} | ${slot.start_time} - ${slot.end_time}</span>
+                    `;
+                    availabilityList.appendChild(slotItem);
+                });
+                generateLinkBtn.disabled = false;
+            }
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            messageContainer.innerHTML = ''; // Clear previous messages
+
+            const username = usernameInput.value;
+            const date = dateInput.value;
+            const startTime = startTimeInput.value;
+            const endTime = endTimeInput.value;
+
+            // Client-side validation
+            if (startTime >= endTime) {
+                displayMessage('End time must be after start time.', 'error');
+                return;
+            }
+
+            // Prepare data for the API call
+            const slotData = {
+                username,
+                date,
+                startTime,
+                endTime
+            };
+
+            try {
+                const response = await fetch('/api/availability', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(slotData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    displayMessage('Availability slot saved successfully!', 'success');
+                    // Add the new slot to our client-side list
+                    savedSlots.push({
+                        date: slotData.date,
+                        start_time: slotData.startTime,
+                        end_time: slotData.endTime
+                    });
+                    renderSavedSlots(); // Re-render the list
+                    form.reset(); // Clear the form
+                    usernameInput.value = username; // Keep the username pre-filled for convenience
+                } else {
+                    // Server-side validation error or other backend error
+                    displayMessage(result.error || 'Failed to save availability.', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                displayMessage('An unexpected error occurred. Please try again.', 'error');
+            }
+        });
+        
+        // Handle Generate Link button click
+        generateLinkBtn.addEventListener('click', () => {
+             const username = usernameInput.value;
+             if (username) {
+                 const link = `${window.location.origin}/book/${username}`;
+                 bookingLink.textContent = link;
+                 bookingLink.href = link;
+                 bookingLinkContainer.style.display = 'block';
+             } else {
+                 alert('Please enter a username first.');
+             }
+        });
+
+        // Initialize the list on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSavedSlots();
+        });
+
+    </script>
+</body>
+</html>

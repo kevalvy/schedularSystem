@@ -1,15 +1,15 @@
 
 import { Pool } from 'pg';
-import constants from './constant.js';
+import ENV_CONFIG from '../lib/constant.js';
 
 class PostgresHelper {
     constructor() {
         this.client = new Pool({
-            host: constants.ENV_CONFIG.PG_HOST,
-            database: constants.ENV_CONFIG.PG_DB,
-            user: constants.ENV_CONFIG.PG_USER,
-            password: constants.ENV_CONFIG.PG_PASSWORD,
-            port: constants.ENV_CONFIG.PG_PORT,
+            host: ENV_CONFIG.DB_HOST,
+            database: ENV_CONFIG.DB_NAME,
+            user: ENV_CONFIG.DB_USER,
+            password:ENV_CONFIG.DB_PASSWORD,
+            port:ENV_CONFIG.DB_PORT,
         });
     }
 

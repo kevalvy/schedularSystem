@@ -1,0 +1,84 @@
+<!-- public/add-user.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register New User</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f9; display: flex; justify-content: center; align-items: flex-start; min-height: 80vh; }
+        .container { max-width: 400px; width: 100%; background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); margin-top: 50px;}
+        h1 { text-align: center; color: #333; margin-bottom: 25px; }
+        form { display: flex; flex-direction: column; gap: 15px; }
+        label { font-weight: bold; color: #555; }
+        input[type="text"] { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
+        input[type="text"]:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); }
+        button { padding: 12px 20px; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; transition: background-color 0.3s; }
+        button:hover { background-color: #218838; }
+        .message-box { text-align: center; padding: 15px; margin: 20px 0; border-radius: 8px; font-weight: bold; }
+        .message-success { background-color: #e6f7d4; color: #52c41a; border: 1px solid #b7eb8f; }
+        .message-error { background-color: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Register New User</h1>
+        <form id="user-registration-form">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" placeholder="Enter a unique username" required>
+            </div>
+            <button type="submit">Register User</button>
+        </form>
+        <div id="message-container" class="message-box" style="display: none;"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('user-registration-form');
+        const usernameInput = document.getElementById('username');
+        const messageContainer = document.getElementById('message-container');
+
+        // Function to display messages
+        function displayMessage(message, type) {
+            messageContainer.textContent = message;
+            messageContainer.className = `message-box message-${type}`;
+            messageContainer.style.display = 'block';
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            messageContainer.style.display = 'none'; // Clear previous messages
+
+            const username = usernameInput.value.trim();
+
+            if (!username) {
+                displayMessage('Username cannot be empty.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/users', { // Target new API endpoint
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    displayMessage(`User '${username}' registered successfully!`, 'success');
+                    form.reset(); // Clear the form
+                } else {
+                    displayMessage(result.error || 'Failed to register user.', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                displayMessage('An unexpected error occurred. Please try again.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
